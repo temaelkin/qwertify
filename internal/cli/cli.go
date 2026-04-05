@@ -34,6 +34,12 @@ func Handle(args []string) {
 		}
 		url := args[2]
 		Edit(url)
+	case "del":
+		if len(args) < 3 {
+			log.Fatal("Usage: qwfy del <url>")
+		}
+		url := args[2]
+		Delete(url)
 	case "all":
 		All()
 	case "help":

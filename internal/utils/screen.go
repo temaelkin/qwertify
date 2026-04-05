@@ -44,10 +44,9 @@ func PrintHelp() {
 	fmt.Println()
 	fmt.Println("qwertify")
 	fmt.Println()
-	fmt.Println("Secure offline CLI password manager.")
-	fmt.Println("Works and stores only on your machine.")
+	fmt.Println("Secure local CLI password manager.")
 	fmt.Println()
-	fmt.Println("temaelkin, 2026, v.1.0.0")
+	fmt.Println("temaelkin, 2026, v0.1.0")
 	fmt.Println()
 	fmt.Println("=========================")
 
@@ -58,8 +57,9 @@ func PrintHelp() {
 	fmt.Println("1. add <url> - add new entry with a URL")
 	fmt.Println("2. get <url> - get exiting entry")
 	fmt.Println("3. edit <url> - edit existing entry")
-	fmt.Println("4. all - get all entries")
-	fmt.Println("5. help - you are here!")
+	fmt.Println("4. del <url> - delete existing entry")
+	fmt.Println("5. all - get all entries")
+	fmt.Println("6. help - you are here!")
 	fmt.Println()
 }
 
