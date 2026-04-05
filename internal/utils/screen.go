@@ -63,9 +63,9 @@ func PrintHelp() {
 	fmt.Println()
 }
 
-func PrintEntry(e vault.Entry, hide bool) {
+func PrintEntry(url string, e vault.Entry, hide bool) {
 	fmt.Println("=========================")
-	fmt.Println(e.URL)
+	fmt.Println(url)
 	fmt.Println("=========================")
 	fmt.Println("Email:    ", e.Email)
 	fmt.Println("Username: ", e.Username)

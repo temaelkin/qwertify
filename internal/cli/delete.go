@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"log"
-	"slices"
 
 	"github.com/temaelkin/qwertify/internal/crypto"
 	"github.com/temaelkin/qwertify/internal/utils"
@@ -31,24 +30,11 @@ func Delete(url string) {
 
 	utils.ClearScreen()
 
-	var index int
-	found := false
-
-	for i, e := range entries {
-		if e.URL == url {
-			index = i
-			found = true
-			break
-		}
+	if _, ok := entries[url]; !ok {
+		log.Fatalf("Entry with URL %s not found", url)
+	} else {
+		delete(entries, url)
 	}
-
-	if !found {
-		log.Fatal("Entry with URL not found:", url)
-	}
-
-	utils.ClearScreen()
-
-	entries = slices.Delete(entries, index, index+1)
 
 	err = s.Lock(inputPassword, entries)
 	if err != nil {

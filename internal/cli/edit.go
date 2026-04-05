@@ -31,20 +31,11 @@ func Edit(url string) {
 	utils.ClearScreen()
 
 	var oldEntry vault.Entry
-	var index int
-	found := false
 
-	for i, e := range entries {
-		if e.URL == url {
-			oldEntry = e
-			index = i
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		log.Fatal("Entry with URL not found:", url)
+	if entry, ok := entries[url]; !ok {
+		log.Fatalf("Entry with URL %s not found", url)
+	} else {
+		oldEntry = entry
 	}
 
 	fmt.Printf("Hint: To keep an old value leave a field empty\n\n")
@@ -65,16 +56,15 @@ func Edit(url string) {
 	}
 
 	newEntry := vault.Entry{
-		URL:      url,
 		Password: password,
 		Email:    email,
 		Username: username,
 	}
 
 	utils.ClearScreen()
-	utils.PrintEntry(newEntry, true)
+	utils.PrintEntry(url, newEntry, true)
 
-	entries[index] = newEntry
+	entries[url] = newEntry
 
 	err = s.Lock(inputPassword, entries)
 	if err != nil {

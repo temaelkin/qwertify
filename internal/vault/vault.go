@@ -19,7 +19,6 @@ type Safe struct {
 }
 
 type Entry struct {
-	URL      string `json:"url"`
 	Password string `json:"password"`
 	Email    string `json:"email"`
 	Username string `json:"user_name"`
@@ -75,7 +74,7 @@ func (s *Safe) SaveOptimistic() error {
 	return storage.WriteRaw(new)
 }
 
-func (s *Safe) Unlock(password []byte) ([]Entry, error) {
+func (s *Safe) Unlock(password []byte) (map[string]Entry, error) {
 	if !crypto.VerifyPassword(s.HashedMaster, password) {
 		return nil, errors.New("invalid password")
 	}
@@ -92,7 +91,7 @@ func (s *Safe) Unlock(password []byte) ([]Entry, error) {
 	}
 	defer crypto.Wipe(decryptedData)
 
-	var entries []Entry
+	entries := make(map[string]Entry)
 	err = json.Unmarshal(decryptedData, &entries)
 	if err != nil {
 		return nil, err
@@ -101,7 +100,7 @@ func (s *Safe) Unlock(password []byte) ([]Entry, error) {
 	return entries, nil
 }
 
-func (s *Safe) Lock(password []byte, entries []Entry) error {
+func (s *Safe) Lock(password []byte, entries map[string]Entry) error {
 	newData, err := json.Marshal(entries)
 	if err != nil {
 		return err

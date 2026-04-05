@@ -31,24 +31,15 @@ func Get(url string) {
 
 	utils.ClearScreen()
 
-	found := false
-
-	for _, e := range entries {
-		if e.URL == url {
-			utils.PrintEntry(e, true)
-			err := clipboard.WriteAll(e.Password)
-			if err != nil {
-				log.Fatal("Error copying password to clipboard:", err)
-			}
-
-			fmt.Println("Password copied to clipboard.")
-
-			found = true
-			break
+	if entry, ok := entries[url]; !ok {
+		log.Fatalf("Entry with URL %s not found", url)
+	} else {
+		utils.PrintEntry(url, entry, true)
+		err := clipboard.WriteAll(entry.Password)
+		if err != nil {
+			log.Fatal("Error copying password to clipboard:", err)
 		}
-	}
 
-	if !found {
-		log.Fatal("Entry not found")
+		fmt.Println("Password copied to clipboard.")
 	}
 }
