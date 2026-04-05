@@ -61,7 +61,7 @@ func Init() {
 		EncryptedData: []byte(""),
 	}
 
-	err = safe.Lock(inputPassword, []vault.Entry{})
+	err = safe.Lock(inputPassword, map[string]vault.Entry{})
 	if err != nil {
 		log.Fatalf("Error locking safe: %v", err)
 	}

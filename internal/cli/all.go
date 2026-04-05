@@ -29,7 +29,7 @@ func All() {
 
 	utils.ClearScreen()
 
-	for _, e := range entries {
-		utils.PrintEntry(e, true)
+	for url, e := range entries {
+		utils.PrintEntry(url, e, true)
 	}
 }

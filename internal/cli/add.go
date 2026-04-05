@@ -49,16 +49,15 @@ func Add(url string) {
 	password := string(pwBytes)
 
 	newEntry := vault.Entry{
-		URL:      url,
 		Password: password,
 		Email:    email,
 		Username: username,
 	}
 
 	utils.ClearScreen()
-	utils.PrintEntry(newEntry, true)
+	utils.PrintEntry(url, newEntry, true)
 
-	entries = append(entries, newEntry)
+	entries[url] = newEntry
 
 	err = s.Lock(inputPassword, entries)
 	if err != nil {
