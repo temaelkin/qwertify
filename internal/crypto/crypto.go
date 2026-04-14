@@ -14,7 +14,7 @@ import (
 const saltSize = 32
 const scryptNParam = 65536
 
-func DecryptData(encryptedData []byte, mainKey []byte) ([]byte, error) {
+func DecryptData(encryptedData []byte, mainKey []byte, associatedData []byte) ([]byte, error) {
 	block, err := aes.NewCipher(mainKey)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func DecryptData(encryptedData []byte, mainKey []byte) ([]byte, error) {
 	}
 
 	nonce, ciphertext := encryptedData[:nonceSize], encryptedData[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, associatedData)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func DecryptData(encryptedData []byte, mainKey []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-func EncryptData(plaintext []byte, mainKey []byte) ([]byte, error) {
+func EncryptData(plaintext []byte, mainKey []byte, associatedData []byte) ([]byte, error) {
 	block, err := aes.NewCipher(mainKey)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func EncryptData(plaintext []byte, mainKey []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, associatedData)
 
 	return ciphertext, nil
 }
