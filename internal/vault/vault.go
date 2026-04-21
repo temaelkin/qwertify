@@ -10,18 +10,37 @@ import (
 )
 
 type Safe struct {
-	User          string `json:"user"`
-	HashedMaster  string `json:"hashed_master_key"`
-	KeySalt       []byte `json:"key_salt"`
-	EncryptedData []byte `json:"encrypted_data"`
+	User string `json:"user"`
+
+	HashedMaster []byte `json:"hashed_master_key"`
+	KeySalt      []byte `json:"key_salt"`
+
+	Entries map[string]Entry `json:"entries"`
 
 	OriginalHash [32]byte `json:"-"`
 }
 
 type Entry struct {
-	Password string `json:"password"`
+	EncryptedPassword []byte `json:"encrypted_password"`
+
 	Email    string `json:"email"`
 	Username string `json:"user_name"`
+
+	Meta string `json:"meta"`
+}
+
+type AD struct {
+	URL      string `json:"url"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+}
+
+func FormAD(url string, email string, username string) ([]byte, error) {
+	return json.Marshal(AD{
+		URL:      url,
+		Email:    email,
+		Username: username,
+	})
 }
 
 func hashData(data []byte) [32]byte {
@@ -74,49 +93,26 @@ func (s *Safe) SaveOptimistic() error {
 	return storage.WriteRaw(new)
 }
 
-func (s *Safe) Unlock(password []byte) (map[string]Entry, error) {
-	if !crypto.VerifyPassword(s.HashedMaster, password) {
+func (s *Safe) Authenticate(masterKey []byte) ([]byte, error) {
+	if !crypto.VerifyPassword(s.HashedMaster, masterKey) {
 		return nil, errors.New("invalid password")
 	}
-
-	mainKey, err := crypto.GetMainKey(s.KeySalt, password)
-	if err != nil {
-		return nil, err
-	}
-	defer crypto.Wipe(mainKey)
-
-	decryptedData, err := crypto.DecryptData(s.EncryptedData, mainKey)
-	if err != nil {
-		return nil, err
-	}
-	defer crypto.Wipe(decryptedData)
-
-	entries := make(map[string]Entry)
-	err = json.Unmarshal(decryptedData, &entries)
-	if err != nil {
-		return nil, err
-	}
-
-	return entries, nil
+	return crypto.GetMainKey(s.KeySalt, masterKey)
 }
 
-func (s *Safe) Lock(password []byte, entries map[string]Entry) error {
-	newData, err := json.Marshal(entries)
+func (e *Entry) Unlock(mainKey []byte, associatedData []byte) ([]byte, error) {
+	decryptedPwd, err := crypto.DecryptData(e.EncryptedPassword, mainKey, associatedData)
+	if err != nil {
+		return nil, err
+	}
+	return decryptedPwd, nil
+}
+
+func (e *Entry) Lock(pwd []byte, mainKey []byte, associatedData []byte) error {
+	encryptedPwd, err := crypto.EncryptData(pwd, mainKey, associatedData)
 	if err != nil {
 		return err
 	}
-
-	mainKey, err := crypto.GetMainKey(s.KeySalt, password)
-	if err != nil {
-		return err
-	}
-	defer crypto.Wipe(mainKey)
-
-	encryptedNewData, err := crypto.EncryptData(newData, mainKey)
-	if err != nil {
-		return err
-	}
-
-	s.EncryptedData = encryptedNewData
+	e.EncryptedPassword = encryptedPwd
 	return nil
 }

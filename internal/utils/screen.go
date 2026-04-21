@@ -17,16 +17,6 @@ func ClearScreen() {
 	}
 }
 
-func hidePassword(pw string) string {
-	var builder strings.Builder
-
-	for i := 0; i < len(pw); i++ {
-		builder.WriteString("*")
-	}
-
-	return builder.String()
-}
-
 func PrintHelp() {
 	ClearScreen()
 
@@ -63,16 +53,13 @@ func PrintHelp() {
 	fmt.Println()
 }
 
-func PrintEntry(url string, e vault.Entry, hide bool) {
+func PrintEntry(url string, e vault.Entry) {
 	fmt.Println("=========================")
 	fmt.Println(url)
 	fmt.Println("=========================")
 	fmt.Println("Email:    ", e.Email)
 	fmt.Println("Username: ", e.Username)
-	if hide {
-		fmt.Println("Password: ", hidePassword(e.Password))
-	} else {
-		fmt.Println("Password: ", e.Password)
-	}
+	fmt.Println("Password:  ********")
+	fmt.Println("=========================")
 	fmt.Println()
 }

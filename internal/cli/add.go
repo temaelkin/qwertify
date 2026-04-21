@@ -23,12 +23,11 @@ func Add(url string) {
 	}
 	defer crypto.Wipe(inputPassword)
 
-	entries, err := s.Unlock(inputPassword)
+	mainKey, err := s.Authenticate(inputPassword)
 	if err != nil {
-		log.Fatal("Error unlocking safe:", err)
+		log.Fatal("Error authenticating:", err)
 	}
-
-	utils.ClearScreen()
+	defer crypto.Wipe(mainKey)
 
 	email, err := utils.GetInput("Enter email: ")
 	if err != nil {
@@ -40,29 +39,32 @@ func Add(url string) {
 		log.Fatal("Input error:", err)
 	}
 
-	pwBytes, err := utils.GetPassword("Enter password: ")
+	password, err := utils.GetPassword("Enter password: ")
 	if err != nil {
 		log.Fatal("Input error:", err)
 	}
-	defer crypto.Wipe(pwBytes)
+	defer crypto.Wipe(password)
 
-	password := string(pwBytes)
+	associatedData, err := vault.FormAD(url, email, username)
+	if err != nil {
+		log.Fatalf("Error forming associated data: %v", err)
+	}
 
 	newEntry := vault.Entry{
-		Password: password,
-		Email:    email,
-		Username: username,
+		EncryptedPassword: nil,
+		Email:             email,
+		Username:          username,
+		Meta:              "",
 	}
 
-	utils.ClearScreen()
-	utils.PrintEntry(url, newEntry, true)
-
-	entries[url] = newEntry
-
-	err = s.Lock(inputPassword, entries)
+	err = newEntry.Lock(password, mainKey, associatedData)
 	if err != nil {
-		log.Fatalf("Error locking safe: %v", err)
+		log.Fatalf("Error locking entry: %v", err)
 	}
+
+	utils.PrintEntry(url, newEntry)
+
+	s.Entries[url] = newEntry
 
 	err = vault.Save(s)
 	if err != nil {
