@@ -11,10 +11,8 @@ import (
 
 type Safe struct {
 	User string `json:"user"`
-	// why do we save hash as string?
-	// TODO: make it []byte
-	// and in crypto.go too
-	HashedMaster string `json:"hashed_master_key"`
+
+	HashedMaster []byte `json:"hashed_master_key"`
 	KeySalt      []byte `json:"key_salt"`
 
 	Entries map[string]Entry `json:"entries"`
@@ -29,6 +27,20 @@ type Entry struct {
 	Username string `json:"user_name"`
 
 	Meta string `json:"meta"`
+}
+
+type AD struct {
+	URL      string `json:"url"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+}
+
+func FormAD(url string, email string, username string) ([]byte, error) {
+	return json.Marshal(AD{
+		URL:      url,
+		Email:    email,
+		Username: username,
+	})
 }
 
 func hashData(data []byte) [32]byte {
@@ -88,17 +100,16 @@ func (s *Safe) Authenticate(masterKey []byte) ([]byte, error) {
 	return crypto.GetMainKey(s.KeySalt, masterKey)
 }
 
-func (e *Entry) Unlock(mainKey []byte, associatedData string) ([]byte, error) {
-	// TODO: meta
-	decryptedPwd, err := crypto.DecryptData(e.EncryptedPassword, mainKey, []byte(associatedData))
+func (e *Entry) Unlock(mainKey []byte, associatedData []byte) ([]byte, error) {
+	decryptedPwd, err := crypto.DecryptData(e.EncryptedPassword, mainKey, associatedData)
 	if err != nil {
 		return nil, err
 	}
 	return decryptedPwd, nil
 }
 
-func (e *Entry) Lock(pwd []byte, mainKey []byte, associatedData string) error {
-	encryptedPwd, err := crypto.EncryptData(pwd, mainKey, []byte(associatedData))
+func (e *Entry) Lock(pwd []byte, mainKey []byte, associatedData []byte) error {
+	encryptedPwd, err := crypto.EncryptData(pwd, mainKey, associatedData)
 	if err != nil {
 		return err
 	}

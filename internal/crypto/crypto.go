@@ -80,8 +80,8 @@ func HashPassword(password []byte) ([]byte, error) {
 	return hashedPassword, nil
 }
 
-func VerifyPassword(hashedPassword string, password []byte) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), password)
+func VerifyPassword(hashedPassword []byte, password []byte) bool {
+	err := bcrypt.CompareHashAndPassword(hashedPassword, password)
 
 	return err == nil
 }
