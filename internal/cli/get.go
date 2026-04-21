@@ -18,24 +18,37 @@ func Get(url string) {
 		log.Fatalf("Error while loading safe: %v", err)
 	}
 
-	inputPassword, err := utils.GetPassword("Enter master password: ")
-	if err != nil {
-		log.Fatal("Error getting password:", err)
-	}
-	defer crypto.Wipe(inputPassword)
-
-	entries, err := s.Unlock(inputPassword)
-	if err != nil {
-		log.Fatal("Error unlocking safe:", err)
-	}
-
-	utils.ClearScreen()
-
-	if entry, ok := entries[url]; !ok {
+	entry, ok := s.Entries[url]
+	if !ok {
 		log.Fatalf("Entry with URL %s not found", url)
 	} else {
-		utils.PrintEntry(url, entry, true)
-		err := clipboard.WriteAll(entry.Password)
+		inputPassword, err := utils.GetPassword("Enter master password: ")
+		if err != nil {
+			log.Fatal("Error getting password:", err)
+		}
+		defer crypto.Wipe(inputPassword)
+
+		mainKey, err := s.Authenticate(inputPassword)
+		if err != nil {
+			log.Fatal("Error authenticating:", err)
+		}
+		defer crypto.Wipe(mainKey)
+
+		utils.PrintEntry(url, entry)
+
+		associatedData, err := vault.FormAD(url, entry.Email, entry.Username)
+		if err != nil {
+			log.Fatalf("Error forming associated data: %v", err)
+		}
+
+		pwd, err := entry.Unlock(mainKey, associatedData)
+		if err != nil {
+			log.Fatal("Error unlocking entry:", err)
+		}
+		defer crypto.Wipe(pwd)
+
+		// unsafe!
+		err = clipboard.WriteAll(string(pwd))
 		if err != nil {
 			log.Fatal("Error copying password to clipboard:", err)
 		}

@@ -21,7 +21,6 @@ func Init() {
 		fmt.Println("Safe already exists.")
 		return
 	}
-	fmt.Println("Making new safe!")
 
 	userName, err := utils.GetInput("Enter your name: ")
 	if err != nil {
@@ -55,15 +54,10 @@ func Init() {
 	}
 
 	safe := vault.Safe{
-		User:          userName,
-		HashedMaster:  string(hashedPassword),
-		KeySalt:       saltForKey,
-		EncryptedData: []byte(""),
-	}
-
-	err = safe.Lock(inputPassword, map[string]vault.Entry{})
-	if err != nil {
-		log.Fatalf("Error locking safe: %v", err)
+		User:         userName,
+		HashedMaster: hashedPassword,
+		KeySalt:      saltForKey,
+		Entries:      map[string]vault.Entry{},
 	}
 
 	err = vault.Save(safe)
