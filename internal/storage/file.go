@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -10,15 +11,15 @@ import (
 
 const file = ".qwertify/safe.json"
 
+var ErrFileLocked = errors.New("storage file is locked by another process")
+
 func getPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
-	path := filepath.Join(home, file)
-
-	return path, nil
+	return filepath.Join(home, file), nil
 }
 
 func ReadRaw() ([]byte, error) {
@@ -28,19 +29,21 @@ func ReadRaw() ([]byte, error) {
 	}
 
 	lock := flock.New(path + ".lock")
-
 	locked, err := lock.TryLock()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to acquire file lock: %w", err)
 	}
-
 	if !locked {
-		return nil, errors.New("file is locked by another process")
+		return nil, ErrFileLocked
 	}
-
 	defer lock.Unlock()
 
-	return os.ReadFile(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read storage file at %q: %w", path, err)
+	}
+
+	return data, nil
 }
 
 func WriteRaw(data []byte) error {
@@ -51,20 +54,17 @@ func WriteRaw(data []byte) error {
 
 	err = os.MkdirAll(filepath.Dir(path), 0700)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
 	lock := flock.New(path + ".lock")
-
 	locked, err := lock.TryLock()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to acquire file lock: %w", err)
 	}
-
 	if !locked {
-		return errors.New("file is locked by another process")
+		return ErrFileLocked
 	}
-
 	defer lock.Unlock()
 
 	tmp := path + ".tmp"
@@ -72,10 +72,15 @@ func WriteRaw(data []byte) error {
 
 	err = os.WriteFile(tmp, data, 0600)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write temporary file: %w", err)
 	}
 
-	return os.Rename(tmp, path)
+	err = os.Rename(tmp, path)
+	if err != nil {
+		return fmt.Errorf("failed to replace storage file: %w", err)
+	}
+
+	return nil
 }
 
 func FileExists() (bool, error) {
@@ -89,7 +94,7 @@ func FileExists() (bool, error) {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("failed to check storage file existence: %w", err)
 	}
 
 	return true, nil
