@@ -16,7 +16,7 @@ func GetInput(prompt string) (string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read input string: %w", err)
 	}
 
 	return strings.TrimSpace(input), nil
@@ -27,7 +27,7 @@ func GetPassword(prompt string) ([]byte, error) {
 
 	bytepw, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read password: %w", err)
 	}
 	fmt.Println()
 
