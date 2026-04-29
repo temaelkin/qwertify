@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"bytes"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log"
@@ -39,8 +39,7 @@ func Init() {
 	}
 	defer crypto.Wipe(inputPasswordConfirm)
 
-	// TODO: subtle.ConstantTimeComparison
-	if !bytes.Equal(inputPassword, inputPasswordConfirm) {
+	if subtle.ConstantTimeCompare(inputPassword, inputPasswordConfirm) != 1 {
 		fmt.Println("Passwords do not match! Please try again.")
 		return
 	}
