@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,41 +15,42 @@ func Add(url string) {
 
 	s, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Error while loading safe: %v", err)
+		log.Fatalf("Failed to load safe file: %v", err)
 	}
 
 	inputPassword, err := utils.GetPassword("Enter master password: ")
 	if err != nil {
-		log.Fatal("Error getting password:", err)
+		log.Fatalf("Failed to read password: %v", err)
 	}
 	defer crypto.Wipe(inputPassword)
 
 	mainKey, err := s.Authenticate(inputPassword)
 	if err != nil {
-		log.Fatal("Error authenticating:", err)
+		if errors.Is(err, vault.ErrInvalidPassword) {
+			fmt.Println("Invalid password. Please try again.")
+			return
+		}
+		log.Fatalf("Failed to authenticate master password: %v", err)
 	}
 	defer crypto.Wipe(mainKey)
 
 	email, err := utils.GetInput("Enter email: ")
 	if err != nil {
-		log.Fatal("Input error:", err)
+		log.Fatalf("Failed to read input: %v", err)
 	}
 
 	username, err := utils.GetInput("Enter username: ")
 	if err != nil {
-		log.Fatal("Input error:", err)
+		log.Fatalf("Failed to read input: %v", err)
 	}
 
 	password, err := utils.GetPassword("Enter password: ")
 	if err != nil {
-		log.Fatal("Input error:", err)
+		log.Fatalf("Failed to read password: %v", err)
 	}
 	defer crypto.Wipe(password)
 
-	associatedData, err := vault.FormAD(url, email, username)
-	if err != nil {
-		log.Fatalf("Error forming associated data: %v", err)
-	}
+	associatedData := vault.FormAD(url, email, username)
 
 	newEntry := vault.Entry{
 		EncryptedPassword: nil,
@@ -59,7 +61,7 @@ func Add(url string) {
 
 	err = newEntry.Lock(password, mainKey, associatedData)
 	if err != nil {
-		log.Fatalf("Error locking entry: %v", err)
+		log.Fatalf("Failed to lock entry: %v", err)
 	}
 
 	utils.PrintEntry(url, newEntry)
@@ -68,7 +70,7 @@ func Add(url string) {
 
 	err = vault.Save(s)
 	if err != nil {
-		log.Fatalf("Error saving safe: %v", err)
+		log.Fatalf("Failed to write safe file: %v", err)
 	}
 
 	fmt.Println("Entry added successfully!")

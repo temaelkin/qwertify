@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -15,42 +16,45 @@ func Get(url string) {
 
 	s, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Error while loading safe: %v", err)
+		log.Fatalf("Failed to load safe file: %v", err)
 	}
 
 	entry, ok := s.Entries[url]
 	if !ok {
-		log.Fatalf("Entry with URL %s not found", url)
+		fmt.Printf("Entry with URL %q not found.\n", url)
+		return
 	} else {
 		inputPassword, err := utils.GetPassword("Enter master password: ")
 		if err != nil {
-			log.Fatal("Error getting password:", err)
+			log.Fatalf("Failed to read password: %v", err)
 		}
 		defer crypto.Wipe(inputPassword)
 
 		mainKey, err := s.Authenticate(inputPassword)
 		if err != nil {
-			log.Fatal("Error authenticating:", err)
+			if errors.Is(err, vault.ErrInvalidPassword) {
+				fmt.Println("Invalid password. Please try again.")
+				return
+			}
+			log.Fatalf("Failed to authenticate master password: %v", err)
 		}
 		defer crypto.Wipe(mainKey)
 
 		utils.PrintEntry(url, entry)
 
-		associatedData, err := vault.FormAD(url, entry.Email, entry.Username)
-		if err != nil {
-			log.Fatalf("Error forming associated data: %v", err)
-		}
+		associatedData := vault.FormAD(url, entry.Email, entry.Username)
 
 		pwd, err := entry.Unlock(mainKey, associatedData)
 		if err != nil {
-			log.Fatal("Error unlocking entry:", err)
+			fmt.Println("Cannot retrieve password. Check input or data integrity.")
+			return
 		}
 		defer crypto.Wipe(pwd)
 
-		// unsafe!
+		// TODO: different clipboard package
 		err = clipboard.WriteAll(string(pwd))
 		if err != nil {
-			log.Fatal("Error copying password to clipboard:", err)
+			log.Fatalf("Failed to copy password to clipboard: %v", err)
 		}
 
 		fmt.Println("Password copied to clipboard.")

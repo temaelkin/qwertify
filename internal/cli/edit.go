@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,18 +15,22 @@ func Edit(url string) {
 
 	s, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Error while loading safe: %v", err)
+		log.Fatalf("Failed to load safe file: %v", err)
 	}
 
 	inputPassword, err := utils.GetPassword("Enter master password: ")
 	if err != nil {
-		log.Fatal("Error getting password:", err)
+		log.Fatalf("Failed to read password: %v", err)
 	}
 	defer crypto.Wipe(inputPassword)
 
 	mainKey, err := s.Authenticate(inputPassword)
 	if err != nil {
-		log.Fatal("Error authenticating:", err)
+		if errors.Is(err, vault.ErrInvalidPassword) {
+			fmt.Println("Invalid password. Please try again.")
+			return
+		}
+		log.Fatalf("Failed to authenticate master password: %v", err)
 	}
 	defer crypto.Wipe(mainKey)
 
@@ -34,10 +39,10 @@ func Edit(url string) {
 
 	entry, ok := s.Entries[url]
 	if !ok {
-		log.Fatalf("Entry with URL %s not found", url)
-	} else {
-		oldEntry = entry
+		fmt.Printf("Entry with URL %q not found.\n", url)
+		return
 	}
+	oldEntry = entry
 
 	utils.PrintEntry(url, oldEntry)
 
@@ -45,7 +50,7 @@ func Edit(url string) {
 
 	email, err := utils.GetInput("Enter new email: ")
 	if err != nil {
-		log.Fatal("Input error:", err)
+		log.Fatalf("Failed to read input: %v", err)
 	}
 	if email == "" {
 		newEntry.Email = oldEntry.Email
@@ -55,7 +60,7 @@ func Edit(url string) {
 
 	username, err := utils.GetInput("Enter new username: ")
 	if err != nil {
-		log.Fatal("Input error:", err)
+		log.Fatalf("Failed to read input: %v", err)
 	}
 	if username == "" {
 		newEntry.Username = oldEntry.Username
@@ -65,40 +70,34 @@ func Edit(url string) {
 
 	password, err := utils.GetPassword("Enter password: ")
 	if err != nil {
-		log.Fatal("Input error:", err)
+		log.Fatalf("Failed to read password: %v", err)
 	}
 	defer crypto.Wipe(password)
 
 	if len(password) == 0 {
-		oldAssociatedData, err := vault.FormAD(url, oldEntry.Email, oldEntry.Username)
-		if err != nil {
-			log.Fatalf("Error forming associated data: %v", err)
-		}
+		// Keep the old password
+		oldAssociatedData := vault.FormAD(url, oldEntry.Email, oldEntry.Username)
 
 		oldPwd, err := oldEntry.Unlock(mainKey, oldAssociatedData)
 		if err != nil {
-			log.Fatalf("Error unlocking entry: %v", err)
+			fmt.Println("Cannot retrieve password. Check input or data integrity.")
+			return
 		}
 		defer crypto.Wipe(oldPwd)
 
-		newAssociatedData, err := vault.FormAD(url, newEntry.Email, newEntry.Username)
-		if err != nil {
-			log.Fatalf("Error forming associated data: %v", err)
-		}
+		newAssociatedData := vault.FormAD(url, newEntry.Email, newEntry.Username)
 
 		err = newEntry.Lock(oldPwd, mainKey, newAssociatedData)
 		if err != nil {
-			log.Fatalf("Error locking entry: %v", err)
+			log.Fatalf("Failed to lock entry: %v", err)
 		}
 	} else {
-		associatedData, err := vault.FormAD(url, newEntry.Email, newEntry.Username)
-		if err != nil {
-			log.Fatalf("Error forming associated data: %v", err)
-		}
+		// Use new password
+		associatedData := vault.FormAD(url, newEntry.Email, newEntry.Username)
 
 		err = newEntry.Lock(password, mainKey, associatedData)
 		if err != nil {
-			log.Fatalf("Error locking entry: %v", err)
+			log.Fatalf("Failed to lock entry: %v", err)
 		}
 	}
 
@@ -108,7 +107,11 @@ func Edit(url string) {
 
 	err = s.SaveOptimistic()
 	if err != nil {
-		log.Fatalf("Error saving safe: %v", err)
+		if errors.Is(err, vault.ErrConcurrentModification) {
+			fmt.Println("Failed to save: safe was modified by another process.")
+			return
+		}
+		log.Fatalf("Failed to write safe file: %v", err)
 	}
 
 	fmt.Println("Entry updated successfully!")

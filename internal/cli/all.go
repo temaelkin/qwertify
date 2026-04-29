@@ -13,7 +13,7 @@ func All() {
 
 	s, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Error while loading safe: %v", err)
+		log.Fatalf("Failed to load safe file: %v", err)
 	}
 
 	for url := range s.Entries {

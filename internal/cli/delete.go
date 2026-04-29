@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -13,19 +14,24 @@ func Delete(url string) {
 
 	s, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Error while loading safe: %v", err)
+		log.Fatalf("Failed to load safe file: %v", err)
 	}
 
 	_, ok := s.Entries[url]
 	if !ok {
-		log.Fatalf("Entry with URL %s not found", url)
+		fmt.Printf("Entry with URL %q not found.\n", url)
+		return
 	} else {
 		delete(s.Entries, url)
 	}
 
 	err = s.SaveOptimistic()
 	if err != nil {
-		log.Fatalf("Error saving safe: %v", err)
+		if errors.Is(err, vault.ErrConcurrentModification) {
+			fmt.Println("Failed to save: safe was modified by another process.")
+			return
+		}
+		log.Fatalf("Failed to write safe file: %v", err)
 	}
 
 	fmt.Printf("Entry %s deleted successfully!", url)
