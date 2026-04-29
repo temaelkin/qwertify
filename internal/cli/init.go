@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 
@@ -14,9 +15,8 @@ import (
 func Init() {
 	exists, err := storage.FileExists()
 	if err != nil {
-		log.Fatalf("Error getting path: %v", err)
+		log.Fatalf("Failed to check if safe file exists: %v", err)
 	}
-
 	if exists {
 		fmt.Println("Safe already exists.")
 		return
@@ -24,33 +24,35 @@ func Init() {
 
 	userName, err := utils.GetInput("Enter your name: ")
 	if err != nil {
-		log.Fatal("Input error:", err)
+		log.Fatalf("Failed to read input: %v", err)
 	}
 
 	inputPassword, err := utils.GetPassword("Enter master password: ")
 	if err != nil {
-		log.Fatal("Error getting password:", err)
+		log.Fatalf("Failed to read password: %v", err)
 	}
 	defer crypto.Wipe(inputPassword)
 
 	inputPasswordConfirm, err := utils.GetPassword("Confirm master password: ")
 	if err != nil {
-		log.Fatal("Error getting password:", err)
+		log.Fatalf("Failed to read password: %v", err)
 	}
 	defer crypto.Wipe(inputPasswordConfirm)
 
+	// TODO: subtle.ConstantTimeComparison
 	if !bytes.Equal(inputPassword, inputPasswordConfirm) {
-		log.Fatal("Passwords do not match!")
+		fmt.Println("Passwords do not match! Please try again.")
+		return
 	}
 
 	saltForKey, err := crypto.GenSalt()
 	if err != nil {
-		log.Fatal("Error generating salt:", err)
+		log.Fatalf("Failed to generate salt: %v", err)
 	}
 
 	hashedPassword, err := crypto.HashPassword(inputPassword)
 	if err != nil {
-		log.Fatal("Error hashing password:", err)
+		log.Fatalf("Failed to hash password: %v", err)
 	}
 
 	safe := vault.Safe{
@@ -62,7 +64,10 @@ func Init() {
 
 	err = vault.Save(safe)
 	if err != nil {
-		log.Fatalf("Error saving safe: %v", err)
+		if errors.Is(err, storage.ErrFileLocked) {
+			log.Fatal("Another program is using the safe. Close it and try again.")
+		}
+		log.Fatalf("Faild to save safe file: %v", err)
 	}
 
 	fmt.Println("Safe created successfully!")
