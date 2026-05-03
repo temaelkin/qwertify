@@ -34,7 +34,7 @@ func PrintHelp() {
 	fmt.Println()
 	fmt.Println("qwertify")
 	fmt.Println()
-	fmt.Println("Secure local CLI password manager.")
+	fmt.Println("(Pretty much) secure local CLI password manager.")
 	fmt.Println()
 	fmt.Println("temaelkin, 2026, v0.1.0")
 	fmt.Println()

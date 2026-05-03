@@ -14,49 +14,49 @@ import (
 func Get(url string) {
 	utils.ClearScreen()
 
-	s, err := vault.Load()
+	v, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Failed to load safe file: %v", err)
+		log.Fatalf("Failed to load vault file: %v", err)
 	}
 
-	entry, ok := s.Entries[url]
+	entry, ok := v.Entries[url]
 	if !ok {
 		fmt.Printf("Entry with URL %q not found.\n", url)
 		return
-	} else {
-		inputPassword, err := utils.GetPassword("Enter master password: ")
-		if err != nil {
-			log.Fatalf("Failed to read password: %v", err)
-		}
-		defer crypto.Wipe(inputPassword)
+	}
 
-		mainKey, err := s.Authenticate(inputPassword)
-		if err != nil {
-			if errors.Is(err, vault.ErrInvalidPassword) {
-				fmt.Println("Invalid password. Please try again.")
-				return
-			}
-			log.Fatalf("Failed to authenticate master password: %v", err)
-		}
-		defer crypto.Wipe(mainKey)
+	master, err := utils.GetPassword("Enter master password: ")
+	if err != nil {
+		log.Fatalf("Failed to read password: %v", err)
+	}
+	defer crypto.Wipe(master)
 
-		utils.PrintEntry(url, entry)
-
-		associatedData := vault.FormAD(url, entry.Email, entry.Username)
-
-		pwd, err := entry.Unlock(mainKey, associatedData)
-		if err != nil {
-			fmt.Println("Cannot retrieve password. Check input or data integrity.")
+	key, err := v.Authenticate(master)
+	if err != nil {
+		if errors.Is(err, vault.ErrInvalidPassword) {
+			fmt.Println("Invalid password. Please try again.")
 			return
 		}
-		defer crypto.Wipe(pwd)
-
-		// TODO: different clipboard package
-		err = clipboard.WriteAll(string(pwd))
-		if err != nil {
-			log.Fatalf("Failed to copy password to clipboard: %v", err)
-		}
-
-		fmt.Println("Password copied to clipboard.")
+		log.Fatalf("Failed to authenticate master password: %v", err)
 	}
+	defer crypto.Wipe(key)
+
+	utils.PrintEntry(url, entry)
+
+	authData := vault.FormAuthData(url, entry.Email, entry.Username)
+
+	password, err := entry.Unlock(key, authData)
+	if err != nil {
+		fmt.Println("Cannot retrieve password. Check input or data integrity.")
+		return
+	}
+	defer crypto.Wipe(password)
+
+	// TODO: different clipboard package
+	err = clipboard.WriteAll(string(password))
+	if err != nil {
+		log.Fatalf("Failed to copy password to clipboard: %v", err)
+	}
+
+	fmt.Println("Password copied to clipboard.")
 }

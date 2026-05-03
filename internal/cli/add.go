@@ -13,18 +13,18 @@ import (
 func Add(url string) {
 	utils.ClearScreen()
 
-	s, err := vault.Load()
+	v, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Failed to load safe file: %v", err)
+		log.Fatalf("Failed to load vault file: %v", err)
 	}
 
-	inputPassword, err := utils.GetPassword("Enter master password: ")
+	master, err := utils.GetPassword("Enter master password: ")
 	if err != nil {
 		log.Fatalf("Failed to read password: %v", err)
 	}
-	defer crypto.Wipe(inputPassword)
+	defer crypto.Wipe(master)
 
-	mainKey, err := s.Authenticate(inputPassword)
+	key, err := v.Authenticate(master)
 	if err != nil {
 		if errors.Is(err, vault.ErrInvalidPassword) {
 			fmt.Println("Invalid password. Please try again.")
@@ -32,7 +32,7 @@ func Add(url string) {
 		}
 		log.Fatalf("Failed to authenticate master password: %v", err)
 	}
-	defer crypto.Wipe(mainKey)
+	defer crypto.Wipe(key)
 
 	email, err := utils.GetInput("Enter email: ")
 	if err != nil {
@@ -50,27 +50,27 @@ func Add(url string) {
 	}
 	defer crypto.Wipe(password)
 
-	associatedData := vault.FormAD(url, email, username)
+	authData := vault.FormAuthData(url, email, username)
 
-	newEntry := vault.Entry{
+	entry := vault.Entry{
 		EncryptedPassword: nil,
 		Email:             email,
 		Username:          username,
 		Meta:              "",
 	}
 
-	err = newEntry.Lock(password, mainKey, associatedData)
+	err = entry.Lock(password, key, authData)
 	if err != nil {
 		log.Fatalf("Failed to lock entry: %v", err)
 	}
 
-	utils.PrintEntry(url, newEntry)
+	utils.PrintEntry(url, entry)
 
-	s.Entries[url] = newEntry
+	v.Entries[url] = entry
 
-	err = vault.Save(s)
+	err = vault.Save(v)
 	if err != nil {
-		log.Fatalf("Failed to write safe file: %v", err)
+		log.Fatalf("Failed to write vault file: %v", err)
 	}
 
 	fmt.Println("Entry added successfully!")
