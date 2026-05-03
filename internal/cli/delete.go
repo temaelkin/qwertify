@@ -12,26 +12,26 @@ import (
 func Delete(url string) {
 	utils.ClearScreen()
 
-	s, err := vault.Load()
+	v, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Failed to load safe file: %v", err)
+		log.Fatalf("Failed to load vault file: %v", err)
 	}
 
-	_, ok := s.Entries[url]
+	_, ok := v.Entries[url]
 	if !ok {
 		fmt.Printf("Entry with URL %q not found.\n", url)
 		return
-	} else {
-		delete(s.Entries, url)
 	}
 
-	err = s.SaveOptimistic()
+	delete(v.Entries, url)
+
+	err = v.SaveOptimistic()
 	if err != nil {
 		if errors.Is(err, vault.ErrConcurrentModification) {
-			fmt.Println("Failed to save: safe was modified by another process.")
+			fmt.Println("Failed to save: vault was modified by another process.")
 			return
 		}
-		log.Fatalf("Failed to write safe file: %v", err)
+		log.Fatalf("Failed to write vault file: %v", err)
 	}
 
 	fmt.Printf("Entry %s deleted successfully!", url)

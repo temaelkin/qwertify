@@ -12,13 +12,15 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-const saltSize = 32
-const scryptNParam = 65536
+const (
+	saltSize     = 32
+	scryptNParam = 65536
+)
 
 var ErrMalformedCiphertext = errors.New("malformed ciphertext: insufficient data for nonce")
 
-func DecryptData(encryptedData []byte, mainKey []byte, associatedData []byte) ([]byte, error) {
-	block, err := aes.NewCipher(mainKey)
+func DecryptData(encryptedData []byte, encryptionKey []byte, authData []byte) ([]byte, error) {
+	block, err := aes.NewCipher(encryptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid key for AES cipher: %w", err)
 	}
@@ -34,7 +36,7 @@ func DecryptData(encryptedData []byte, mainKey []byte, associatedData []byte) ([
 	}
 
 	nonce, ciphertext := encryptedData[:nonceSize], encryptedData[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, associatedData)
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, authData)
 	if err != nil {
 		// Do not wrap the error: preserve security semantics of decryption failure
 		return nil, err
@@ -43,8 +45,8 @@ func DecryptData(encryptedData []byte, mainKey []byte, associatedData []byte) ([
 	return plaintext, nil
 }
 
-func EncryptData(plaintext []byte, mainKey []byte, associatedData []byte) ([]byte, error) {
-	block, err := aes.NewCipher(mainKey)
+func EncryptData(plaintext []byte, encryptionKey []byte, authData []byte) ([]byte, error) {
+	block, err := aes.NewCipher(encryptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid key for AES cipher: %w", err)
 	}
@@ -59,20 +61,20 @@ func EncryptData(plaintext []byte, mainKey []byte, associatedData []byte) ([]byt
 		return nil, fmt.Errorf("failed to read random nonce: %w", err)
 	}
 
-	ciphertext := gcm.Seal(nonce, nonce, plaintext, associatedData)
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, authData)
 
 	return ciphertext, nil
 }
 
 func GenSalt() ([]byte, error) {
-	b := make([]byte, saltSize)
+	salt := make([]byte, saltSize)
 
-	_, err := rand.Read(b)
+	_, err := rand.Read(salt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random salt: %w", err)
 	}
 
-	return b, nil
+	return salt, nil
 }
 
 func HashPassword(password []byte) ([]byte, error) {
@@ -89,13 +91,13 @@ func VerifyPassword(hashedPassword []byte, password []byte) bool {
 	return err == nil
 }
 
-func GetMainKey(salt, password []byte) ([]byte, error) {
-	mainKey, err := scrypt.Key(password, salt, scryptNParam, 8, 1, 32)
+func GetEncryptionKey(salt []byte, password []byte) ([]byte, error) {
+	encryptionKey, err := scrypt.Key(password, salt, scryptNParam, 8, 1, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive key with scrypt: %w", err)
 	}
 
-	return mainKey, nil
+	return encryptionKey, nil
 }
 
 func Wipe(data []byte) {

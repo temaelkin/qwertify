@@ -10,37 +10,39 @@ import (
 	"github.com/temaelkin/qwertify/internal/storage"
 )
 
-var ErrConcurrentModification = errors.New("safe was modified by another process")
-var ErrInvalidPassword = errors.New("invalid password")
+var (
+	ErrConcurrentModification = errors.New("vault was modified by another process")
+	ErrInvalidPassword        = errors.New("invalid password")
+)
 
-type Safe struct {
+type Vault struct {
 	User string `json:"user"`
 
-	HashedMaster []byte `json:"hashed_master_key"`
-	KeySalt      []byte `json:"key_salt"`
+	HashedMaster   []byte `json:"hashed_master_key"`
+	DerivationSalt []byte `json:"key_salt"`
 
 	Entries map[string]Entry `json:"entries"`
 
-	OriginalHash [32]byte `json:"-"`
+	StateHash [32]byte `json:"-"`
 }
 
 type Entry struct {
 	EncryptedPassword []byte `json:"encrypted_password"`
 
 	Email    string `json:"email"`
-	Username string `json:"user_name"`
+	Username string `json:"username"`
 
 	Meta string `json:"meta"`
 }
 
-type AD struct {
+type AuthData struct {
 	URL      string `json:"url"`
 	Email    string `json:"email"`
 	Username string `json:"username"`
 }
 
-func FormAD(url string, email string, username string) []byte {
-	data, _ := json.Marshal(AD{URL: url, Email: email, Username: username})
+func FormAuthData(url string, email string, username string) []byte {
+	data, _ := json.Marshal(AuthData{URL: url, Email: email, Username: username})
 	return data
 }
 
@@ -48,53 +50,53 @@ func hashData(data []byte) [32]byte {
 	return sha256.Sum256(data)
 }
 
-func Load() (Safe, error) {
+func Load() (Vault, error) {
 	data, err := storage.ReadRaw()
 	if err != nil {
-		return Safe{}, fmt.Errorf("failed to load safe: %w", err)
+		return Vault{}, fmt.Errorf("failed to load vault: %w", err)
 	}
 
-	var s Safe
-	err = json.Unmarshal(data, &s)
+	var v Vault
+	err = json.Unmarshal(data, &v)
 	if err != nil {
-		return Safe{}, fmt.Errorf("failed to parse safe data: invalid or corrupted JSON: %w", err)
+		return Vault{}, fmt.Errorf("failed to parse vault data: invalid or corrupted JSON: %w", err)
 	}
 
-	s.OriginalHash = hashData(data)
+	v.StateHash = hashData(data)
 
-	return s, nil
+	return v, nil
 }
 
-func Save(s Safe) error {
-	data, err := json.MarshalIndent(s, "", " ")
+func Save(v Vault) error {
+	data, err := json.MarshalIndent(v, "", " ")
 	if err != nil {
-		return fmt.Errorf("failed to serialize safe data: %w", err)
+		return fmt.Errorf("failed to serialize vault data: %w", err)
 	}
 
 	err = storage.WriteRaw(data)
 	if err != nil {
-		return fmt.Errorf("failed to save safe to storage: %w", err)
+		return fmt.Errorf("failed to save vault to storage: %w", err)
 	}
 
 	return nil
 }
 
-func (s *Safe) SaveOptimistic() error {
+func (v *Vault) SaveOptimistic() error {
 	current, err := storage.ReadRaw()
 	if err != nil {
-		return fmt.Errorf("failed to read current safe state for optimistic save: %w", err)
+		return fmt.Errorf("failed to read current vault state for optimistic save: %w", err)
 	}
 
-	if hashData(current) != s.OriginalHash {
+	if hashData(current) != v.StateHash {
 		return ErrConcurrentModification
 	}
 
-	new, err := json.MarshalIndent(s, "", " ")
+	new, err := json.MarshalIndent(v, "", " ")
 	if err != nil {
-		return fmt.Errorf("failed to serialize safe for optimistic save: %w", err)
+		return fmt.Errorf("failed to serialize vault for optimistic save: %w", err)
 	}
 
-	s.OriginalHash = hashData(new)
+	v.StateHash = hashData(new)
 
 	err = storage.WriteRaw(new)
 	if err != nil {
@@ -104,33 +106,33 @@ func (s *Safe) SaveOptimistic() error {
 	return nil
 }
 
-func (s *Safe) Authenticate(masterKey []byte) ([]byte, error) {
-	if !crypto.VerifyPassword(s.HashedMaster, masterKey) {
+func (v *Vault) Authenticate(master []byte) ([]byte, error) {
+	if !crypto.VerifyPassword(v.HashedMaster, master) {
 		return nil, ErrInvalidPassword
 	}
 
-	mainKey, err := crypto.GetMainKey(s.KeySalt, masterKey)
+	encryptionKey, err := crypto.GetEncryptionKey(v.DerivationSalt, master)
 	if err != nil {
-		return nil, fmt.Errorf("failed to derive main key during authentication: %w", err)
+		return nil, fmt.Errorf("failed to derive encryption key during authentication: %w", err)
 	}
 
-	return mainKey, nil
+	return encryptionKey, nil
 }
 
-func (e *Entry) Unlock(mainKey []byte, associatedData []byte) ([]byte, error) {
-	decryptedPwd, err := crypto.DecryptData(e.EncryptedPassword, mainKey, associatedData)
+func (e *Entry) Unlock(encryptionKey []byte, authData []byte) ([]byte, error) {
+	decryptedPassword, err := crypto.DecryptData(e.EncryptedPassword, encryptionKey, authData)
 	if err != nil {
 		// Do not wrap the error: preserve security semantics of decryption failure
 		return nil, err
 	}
-	return decryptedPwd, nil
+	return decryptedPassword, nil
 }
 
-func (e *Entry) Lock(pwd []byte, mainKey []byte, associatedData []byte) error {
-	encryptedPwd, err := crypto.EncryptData(pwd, mainKey, associatedData)
+func (e *Entry) Lock(password []byte, encryptionKey []byte, authData []byte) error {
+	encryptedPassword, err := crypto.EncryptData(password, encryptionKey, authData)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt password for entry: %w", err)
 	}
-	e.EncryptedPassword = encryptedPwd
+	e.EncryptedPassword = encryptedPassword
 	return nil
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/gofrs/flock"
 )
 
-const file = ".qwertify/safe.json"
+const file = ".qwertify/vault.json"
 
 var ErrFileLocked = errors.New("storage file is locked by another process")
 

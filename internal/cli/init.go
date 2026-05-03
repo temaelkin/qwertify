@@ -15,59 +15,59 @@ import (
 func Init() {
 	exists, err := storage.FileExists()
 	if err != nil {
-		log.Fatalf("Failed to check if safe file exists: %v", err)
+		log.Fatalf("Failed to check if vault file exists: %v", err)
 	}
 	if exists {
-		fmt.Println("Safe already exists.")
+		fmt.Println("Vault already exists.")
 		return
 	}
 
-	userName, err := utils.GetInput("Enter your name: ")
+	user, err := utils.GetInput("Enter your name: ")
 	if err != nil {
 		log.Fatalf("Failed to read input: %v", err)
 	}
 
-	inputPassword, err := utils.GetPassword("Enter master password: ")
+	master, err := utils.GetPassword("Enter master password: ")
 	if err != nil {
 		log.Fatalf("Failed to read password: %v", err)
 	}
-	defer crypto.Wipe(inputPassword)
+	defer crypto.Wipe(master)
 
-	inputPasswordConfirm, err := utils.GetPassword("Confirm master password: ")
+	masterConfirm, err := utils.GetPassword("Confirm master password: ")
 	if err != nil {
 		log.Fatalf("Failed to read password: %v", err)
 	}
-	defer crypto.Wipe(inputPasswordConfirm)
+	defer crypto.Wipe(masterConfirm)
 
-	if subtle.ConstantTimeCompare(inputPassword, inputPasswordConfirm) != 1 {
+	if subtle.ConstantTimeCompare(master, masterConfirm) != 1 {
 		fmt.Println("Passwords do not match! Please try again.")
 		return
 	}
 
-	saltForKey, err := crypto.GenSalt()
+	salt, err := crypto.GenSalt()
 	if err != nil {
 		log.Fatalf("Failed to generate salt: %v", err)
 	}
 
-	hashedPassword, err := crypto.HashPassword(inputPassword)
+	hashedMaster, err := crypto.HashPassword(master)
 	if err != nil {
 		log.Fatalf("Failed to hash password: %v", err)
 	}
 
-	safe := vault.Safe{
-		User:         userName,
-		HashedMaster: hashedPassword,
-		KeySalt:      saltForKey,
-		Entries:      map[string]vault.Entry{},
+	v := vault.Vault{
+		User:           user,
+		HashedMaster:   hashedMaster,
+		DerivationSalt: salt,
+		Entries:        map[string]vault.Entry{},
 	}
 
-	err = vault.Save(safe)
+	err = vault.Save(v)
 	if err != nil {
 		if errors.Is(err, storage.ErrFileLocked) {
-			log.Fatal("Another program is using the safe. Close it and try again.")
+			log.Fatal("Another program is using the vault. Close it and try again.")
 		}
-		log.Fatalf("Faild to save safe file: %v", err)
+		log.Fatalf("Faild to save v file: %v", err)
 	}
 
-	fmt.Println("Safe created successfully!")
+	fmt.Println("Vault created successfully!")
 }

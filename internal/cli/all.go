@@ -11,12 +11,12 @@ import (
 func All() {
 	utils.ClearScreen()
 
-	s, err := vault.Load()
+	v, err := vault.Load()
 	if err != nil {
-		log.Fatalf("Failed to load safe file: %v", err)
+		log.Fatalf("Failed to load vault file: %v", err)
 	}
 
-	for url := range s.Entries {
+	for url := range v.Entries {
 		fmt.Println(url)
 		fmt.Println()
 	}

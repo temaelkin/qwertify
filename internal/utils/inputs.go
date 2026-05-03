@@ -25,11 +25,11 @@ func GetInput(prompt string) (string, error) {
 func GetPassword(prompt string) ([]byte, error) {
 	fmt.Print(prompt)
 
-	bytepw, err := term.ReadPassword(int(syscall.Stdin))
+	password, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read password: %w", err)
 	}
 	fmt.Println()
 
-	return bytepw, nil
+	return password, nil
 }
